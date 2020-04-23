@@ -235,8 +235,18 @@ opt = finputcheck(varargin, {
     'anattype'  ''        {}    'T1w';
     'defaced'   'string'  {'on' 'off'}    'on';
     'README'    'string'  {}    '';
-    'CHANGES'   'string'  {}    '' ;
-    'copydata'   'real'   [0 1] 1 }, 'bids_export');
+    'CHANGES'   'string'  {}    '';
+    'copydata'  'real'    [0 1] 1 ;
+    'mobi'      'boolean' [0 1] 0 ;     }, 'bids_export');
+
+if opt.mobi
+    dataType = 'mobi';
+    typeSuffixLength = 8;
+else
+    dataType = 'eeg';
+    typeSuffixLength = 7;
+end
+
 if isstr(opt), error(opt); end
 if size(opt.stimuli,1) == 1 || size(opt.stimuli,1) == 1
     opt.stimuli = reshape(opt.stimuli, [2 length(opt.stimuli)/2])';
@@ -526,21 +536,21 @@ for iSubj = 1:length(files)
     switch bidscase
         case 1 % Single-Session Single-Run
             
-            fileOut = fullfile(opt.targetdir, subjectStr, 'eeg', [ subjectStr '_task-' opt.taskName '_eeg' files(iSubj).file{1}(end-3:end)]);
+            fileOut = fullfile(opt.targetdir, subjectStr, dataType, [ subjectStr '_task-' opt.taskName '_' dataType files(iSubj).file{1}(end-3:end)]);
             %             copy_data_bids( files(iSubj).file{1}, fileOut, opt.eInfo, opt.tInfo, opt.trialtype, chanlocs{iSubj}, opt.copydata);
             copy_data_bids( files(iSubj).file{1}, fileOut, opt, files(iSubj).chanlocs{1}, opt.copydata);
             
         case 2 % Single-Session Mult-Run
             
             for iRun = 1:length(files(iSubj).run)
-                fileOut = fullfile(opt.targetdir, subjectStr, 'eeg', [ subjectStr  '_task-' opt.taskName sprintf('_run-%2.2d', iRun) '_eeg' files(iSubj).file{iRun}(end-3:end) ]);
+                fileOut = fullfile(opt.targetdir, subjectStr, dataType, [ subjectStr  '_task-' opt.taskName sprintf('_run-%2.2d', iRun) '_' dataType files(iSubj).file{iRun}(end-3:end) ]);
                 copy_data_bids( files(iSubj).file{iRun}, fileOut, opt, files(iSubj).chanlocs{iRun}, opt.copydata);
             end
             
         case 3 % Mult-Session Single-Run
             
             for iSess = 1:length(unique(files(iSubj).session))
-                fileOut = fullfile(opt.targetdir, subjectStr, sprintf('ses-%2.2d', iSess), 'eeg', [ subjectStr sprintf('_ses-%2.2d', iSess) '_task-' opt.taskName '_eeg' files(iSubj).file{iSess}(end-3:end)]);
+                fileOut = fullfile(opt.targetdir, subjectStr, sprintf('ses-%2.2d', iSess), dataType, [ subjectStr sprintf('_ses-%2.2d', iSess) '_task-' opt.taskName '_' dataType files(iSubj).file{iSess}(end-3:end)]);
                 copy_data_bids( files(iSubj).file{iSess}, fileOut, opt, files(iSubj).chanlocs{iSess}, opt.copydata);
             end
             
@@ -550,7 +560,7 @@ for iSubj = 1:length(files)
                 runindx = find(files(iSubj).session == iSess);
                 for iSet = runindx
                     iRun = files(iSubj).run(iSet);
-                    fileOut = fullfile(opt.targetdir, subjectStr, sprintf('ses-%2.2d', iSess), 'eeg', [ subjectStr sprintf('_ses-%2.2d', iSess) '_task-' opt.taskName  sprintf('_run-%2.2d', iRun) '_eeg' files(iSubj).file{iSet}(end-3:end)]);
+                    fileOut = fullfile(opt.targetdir, subjectStr, sprintf('ses-%2.2d', iSess), dataType, [ subjectStr sprintf('_ses-%2.2d', iSess) '_task-' opt.taskName  sprintf('_run-%2.2d', iRun) '_' dataType files(iSubj).file{iSet}(end-3:end)]);
                     copy_data_bids(files(iSubj).file{iSet}, fileOut, opt, files(iSubj).chanlocs{iSet}, opt.copydata);
                 end
             end
@@ -621,10 +631,10 @@ end
 
 % write event file information
 % --- _events.json
-jsonwrite([ fileOut(1:end-7) 'events.json' ], opt.eInfoDesc,struct('indent','  '));
+jsonwrite([ fileOut(1:end-typeSuffixLength) 'events.json' ], opt.eInfoDesc,struct('indent','  '));
 
 % --- _events.tsv
-fid = fopen( [ fileOut(1:end-7) 'events.tsv' ], 'w');
+fid = fopen( [ fileOut(1:end-typeSuffixLength) 'events.tsv' ], 'w');
 
 % -- parse eInfo
 if isempty(opt.eInfo)
@@ -785,24 +795,15 @@ fclose(fid);
 
 % Write channel file information (channels.tsv)
 % Note: Consider using here electrodes_to_tsv.m
-fid = fopen( [ fileOut(1:end-7) 'channels.tsv' ], 'w');
+fid = fopen( [ fileOut(1:end-typeSuffixLength) 'channels.tsv' ], 'w');
 miscChannels = 0;
 
-if ~isempty(chanlocs)
-    EEG.chanlocs = chanlocs;
-    if isstr(chanlocs)
-        EEG.chanlocs = readlocs(EEG.chanlocs);
-    end
-    EEG = eeg_checkchanlocs(EEG);
-    if length(EEG.chanlocs) == EEG.nbchan+1
-        for iChan = 1:length(EEG.chanlocs)
-            EEG.chanlocs(iChan).ref = EEG.chanlocs(end).labels;
-        end
-    elseif length(EEG.chanlocs) ~= EEG.nbchan
-        error(sprintf('Number of channels in channel location inconsistent with data for file %s', fileIn));
-    end
-end
+% Count the number of eeg and mocap channels  
+nbEEGChan = numel(find(strcmp({EEG.chanlocs.type}, 'EEG')));
+nbMocapChan = numel(find(strcmp({EEG.chanlocs.type}, 'MOCAP')));
 
+% Write channels.tsv 
+% Includes mocap channels as well 
 if isempty(EEG.chanlocs)
     fprintf(fid, 'name\ttype\tunits\n');
     for iChan = 1:EEG.nbchan, fprintf(fid, 'E%d\tEEG\tmicroV\n', iChan); end
@@ -817,6 +818,27 @@ else
         end
         if strcmpi(type, 'eeg')
             unit = 'microV';
+            
+        elseif strcmpi(type, 'mocap')
+            
+            mocapLabel = EEG.chanlocs(iChan).labels;
+            
+            if strcmpi(mocapLabel(end),'X')||strcmpi(mocapLabel(end),'Y')|| strcmpi(mocapLabel(end),'Z')
+                spatialUnit = 'meters';
+            elseif strcmpi(mocapLabel(end-2:end),'yaw')||strcmpi(mocapLabel(end-4:end),'pitch')|| strcmpi(mocapLabel(end-3:end),'roll')
+                spatialUnit = 'degrees';
+            end
+            
+            if strcmpi(mocapLabel(1:4),'quat')
+                timeUnit = []; 
+            elseif strcmpi(mocapLabel(1:3),'vel')
+                timeUnit = ' per second';
+            elseif strcmpi(mocapLabel(1:3),'acc')
+                timeUnit = ' per second squared';
+            end
+            
+            unit = [spatialUnit timeUnit];
+            
         else
             unit = 'n/a';
             miscChannels = miscChannels+1;
@@ -827,12 +849,29 @@ else
 end
 fclose(fid);
 
+% Read in the chanloc file
+if ~isempty(chanlocs)
+    EEG.chanlocs = chanlocs;
+    if isstr(chanlocs)
+        EEG.chanlocs = readlocs(EEG.chanlocs);
+    end
+    EEG = eeg_checkchanlocs(EEG);
+    if length(EEG.chanlocs) == nbEEGChan +1
+        for iChan = 1:length(EEG.chanlocs)
+            EEG.chanlocs(iChan).ref = EEG.chanlocs(end).labels;
+        end
+    elseif length(EEG.chanlocs) ~= nbEEGChan
+        error(sprintf('Number of channels in channel location inconsistent with data for file %s', fileIn));
+    end
+end
+
+
 % Write electrode file information (electrodes.tsv)
 if ~isempty(EEG.chanlocs) && isfield(EEG.chanlocs, 'X') && ~isempty(EEG.chanlocs(2).X)
-    fid = fopen( [ fileOut(1:end-7) 'electrodes.tsv' ], 'w');
+    fid = fopen( [ fileOut(1:end-typeSuffixLength) 'electrodes.tsv' ], 'w');
     fprintf(fid, 'name\tx\ty\tz\n');
     
-    for iChan = 1:EEG.nbchan
+    for iChan = 1:nbEEGChan
         if isempty(EEG.chanlocs(iChan).X)
             fprintf(fid, '%s\tn/a\tn/a\tn/a\n', EEG.chanlocs(iChan).labels );
         else
@@ -844,11 +883,11 @@ if ~isempty(EEG.chanlocs) && isfield(EEG.chanlocs, 'X') && ~isempty(EEG.chanlocs
     % Write coordinate file information (coordsystem.json)
     coordsystemStruct.EEGCoordinateUnits = 'mm';
     coordsystemStruct.EEGCoordinateSystem = 'ARS'; % X=Anterior Y=Right Z=Superior
-    writejson( [ fileOut(1:end-7) 'coordsystem.json' ], coordsystemStruct);
+    writejson( [ fileOut(1:end-typeSuffixLength) 'coordsystem.json' ], coordsystemStruct);
 end
 
 % Write task information (eeg.json) Note: depends on channels
-tInfo.EEGChannelCount = EEG.nbchan-miscChannels;
+tInfo.EEGChannelCount = nbEEGChan;
 if miscChannels > 0
     tInfo.MiscChannelCount  = miscChannels;
 end
@@ -871,7 +910,7 @@ end
 tInfo.RecordingDuration = EEG.pnts/EEG.srate;
 tInfo.SamplingFrequency = EEG.srate;
 %     jsonStr = jsonencode(tInfo);
-%     fid = fopen( [fileOut(1:end-7) 'eeg.json' ], 'w');
+%     fid = fopen( [fileOut(1:end-typeSuffixLength) 'eeg.json' ], 'w');
 %     fprintf(fid, '%s', jsonStr);
 %     fclose(fid);
 
@@ -909,7 +948,7 @@ tInfoFields = {...
     'SubjectArtefactDescription' 'OPTIONAL' 'char' '' };
 tInfo = checkfields(tInfo, tInfoFields, 'tInfo');
 
-jsonwrite([fileOut(1:end-7) 'eeg.json' ], tInfo,struct('indent','  '));
+jsonwrite([fileOut(1:end-typeSuffixLength) 'mobi.json' ], tInfo,struct('indent','  '));
 
 % write channel information
 %     cInfo.name.LongName = 'Channel name';
@@ -919,7 +958,7 @@ jsonwrite([fileOut(1:end-7) 'eeg.json' ], tInfo,struct('indent','  '));
 %     cInfo.units.LongName = 'Channel unit';
 %     cInfo.units.Description = 'Channel unit';
 %     jsonStr = jsonencode(cInfo);
-%     fid = fopen( [fileOut(1:end-7) 'channels.json' ], 'w');
+%     fid = fopen( [fileOut(1:end-typeSuffixLength) 'channels.json' ], 'w');
 %     fprintf(fid, '%s', jsonStr);
 %     fclose(fid);
 
