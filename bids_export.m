@@ -834,7 +834,7 @@ fclose(fid);
 % Write mocap channels.tsv 
 fid = fopen( [ fileOut(1:end-typeSuffixLength) '_mocap_channels.tsv' ], 'w');
 if ~isempty(EEG.chanlocs)
-    fprintf(fid, 'name\ttype\tunits\n');
+    fprintf(fid, 'name\tsource\ttype\tcomponent\tunits\n');
     
     for iChan = 1:EEG.nbchan
         if ~isfield(EEG.chanlocs, 'type') || isempty(EEG.chanlocs(iChan).type)
@@ -845,6 +845,30 @@ if ~isempty(EEG.chanlocs)
         if strcmpi(type, 'mocap')
             
             mocapLabel = EEG.chanlocs(iChan).labels;
+            
+            if contains(mocapLabel, 'hand')
+                source = 'hand';
+            elseif contains(mocapLabel, 'head')
+                source = 'head';
+            elseif contains(mocapLabel, 'torso')
+                source = 'torso';
+            elseif contains(mocapLabel, 'arm')
+                source = 'arm';
+            else
+                source = 'n/a';
+            end
+                   
+            if any(strcmpi(mocapLabel(end),{'X', 'Y', 'Z'}))
+                component = mocapLabel(end);
+            elseif strcmpi(mocapLabel(end-2:end),'yaw')
+                component = 'yaw';
+            elseif strcmpi(mocapLabel(end-4:end),'pitch')
+                component = 'pitch';
+            elseif strcmpi(mocapLabel(end-3:end),'roll')
+                component = 'roll';
+            else
+                component = 'n/a';
+            end
             
             if strcmpi(mocapLabel(end),'X')||strcmpi(mocapLabel(end),'Y')|| strcmpi(mocapLabel(end),'Z')
                 spatialUnit = 'meters';
@@ -862,7 +886,7 @@ if ~isempty(EEG.chanlocs)
             
             unit = [spatialUnit timeUnit];
         
-            fprintf(fid, '%s\t%s\t%s\n', EEG.chanlocs(iChan).labels, type, unit);
+            fprintf(fid, '%s\t%s\t%s\t%s\t%s\n', EEG.chanlocs(iChan).labels, source, type, component, unit);
         end
     end
 end
@@ -1045,3 +1069,5 @@ for iRow=1:size(matlabArray,1)
     fprintf(fid, '\n');
 end
 fclose(fid);
+
+
