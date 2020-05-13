@@ -241,10 +241,10 @@ opt = finputcheck(varargin, {
 
 if opt.mobi
     dataType = 'mobi';
-    typeSuffixLength = 8;
+    opt.typeSuffixLength = 8;
 else
     dataType = 'eeg';
-    typeSuffixLength = 7;
+    opt.typeSuffixLength = 7;
 end
 
 if isstr(opt), error(opt); end
@@ -572,7 +572,7 @@ end
 %function copy_data_bids(fileIn, fileOut, eInfo, tInfo, trialtype, chanlocs, copydata)
 function copy_data_bids(fileIn, fileOut, opt, chanlocs, copydata)
 folderOut = fileparts(fileOut);
-typeSuffixLength = length(strtok(fliplr(fileOut), '.'))+1;
+typeSuffixLength = opt.typeSuffixLength; 
 
 if ~exist(folderOut)
     mkdir(folderOut);
@@ -797,7 +797,7 @@ fclose(fid);
 
 % Write channel file information (channels.tsv)
 % Note: Consider using here electrodes_to_tsv.m
-fid = fopen( [ fileOut(1:end-typeSuffixLength) '_eeg_channels.tsv' ], 'w');
+fid = fopen( [ fileOut(1:end-typeSuffixLength) 'eeg_channels.tsv' ], 'w');
 miscChannels = 0;
 
 % Count the number of eeg and mocap channels  
@@ -832,7 +832,7 @@ end
 fclose(fid);
 
 % Write mocap channels.tsv 
-fid = fopen( [ fileOut(1:end-typeSuffixLength) '_mocap_channels.tsv' ], 'w');
+fid = fopen( [ fileOut(1:end-typeSuffixLength) 'motion_channels.tsv' ], 'w');
 if ~isempty(EEG.chanlocs)
     fprintf(fid, 'name\tsource\ttype\tcomponent\tunits\n');
     
