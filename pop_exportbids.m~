@@ -26,7 +26,7 @@
 % along with this program; if not, write to the Free Software
 % Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
-function [STUDY,EEG,com] = pop_exportbids(STUDY, EEG, varargin)
+function [STUDY,ALLEEG,com] = pop_exportbids(STUDY, ALLEEG, varargin)
 
 com = '';
 if isempty(STUDY)
@@ -62,12 +62,12 @@ if nargin < 3 && ~ischar(STUDY)
     relSize = 0.7;
     geometry = { [1] [1] [1-relSize relSize*0.8 relSize*0.2] [1-relSize relSize] [1] [1] [1 1 1] };
     geomvert =   [1  0.2 1                                   1                   1   3   1];
-    userdata.EEG = EEG;
+    userdata.ALLEEG = ALLEEG;
     userdata.STUDY = STUDY;
     [results,userdata,~,restag] = inputgui( 'geometry', geometry, 'geomvert', geomvert, 'uilist', uilist, 'helpcom', 'pophelp(''pop_exportbids'');', 'title', 'Export EEGLAB STUDY to BIDS -- pop_exportbids()', 'userdata', userdata );
     if length(results) == 0, return; end
     STUDY  = userdata.STUDY;
-    EEG = userdata.EEG;
+    ALLEEG = userdata.ALLEEG;
 
     % decode some outputs
     if ~isempty(strfind(restag.license, 'CC0')), restag.license = 'CC0'; end
@@ -79,34 +79,30 @@ if nargin < 3 && ~ischar(STUDY)
 %     end
     
     % options
-    allpInfo = getpInfo(EEG);
+    allpInfo = getpInfo(ALLEEG);
     options = { 'targetdir' restag.outputfolder 'License' restag.license 'CHANGES' restag.changes };
-    if isfield(EEG(1).BIDS, 'gInfo') && isfield(EEG(1).BIDS.gInfo,'README') %as README is combined with taskinfo
-        options = [options 'README' {EEG(1).BIDS.gInfo.README}];
-        EEG(1).BIDS.gInfo = rmfield(EEG(1).BIDS.gInfo,'README');
-    end
-    bidsFieldsFromALLEEG = fieldnames(EEG(1).BIDS); % All EEG should share same BIDS info
+    bidsFieldsFromALLEEG = fieldnames(ALLEEG(1).BIDS); % All EEG should share same BIDS info
     for f=1:numel(bidsFieldsFromALLEEG)
         if strcmp('pInfo', bidsFieldsFromALLEEG{f})
             options = [options 'pInfo' {allpInfo}];
         else
-            options = [options bidsFieldsFromALLEEG{f} {EEG(1).BIDS.(bidsFieldsFromALLEEG{f})}];
+            options = [options bidsFieldsFromALLEEG{f} {ALLEEG(1).BIDS.(bidsFieldsFromALLEEG{f})}];
         end
     end
     
 elseif ischar(STUDY)
     command = STUDY;
-    fig = EEG;
+    fig = ALLEEG;
     userdata = get(fig, 'userdata');
     switch command
         case 'edit_participants'
-            userdata.EEG = pop_participantinfo(userdata.EEG);
+            userdata.ALLEEG = pop_participantinfo(userdata.ALLEEG);
         case 'edit_events'
-            userdata.EEG = pop_eventinfo(userdata.EEG);
+            userdata.ALLEEG = pop_eventinfo(userdata.ALLEEG);
         case 'edit_task'
-            userdata.EEG  = pop_taskinfo(userdata.EEG);
+            userdata.STUDY  = pop_taskinfo(userdata.ALLEEG);
         case 'edit_eeg'
-            userdata.EEG = pop_eegacqinfo(userdata.EEG);
+            userdata.ALLEEG = pop_eegacqinfo(userdata.ALLEEG);
     end
     set(fig, 'userdata', userdata);
     return
@@ -130,15 +126,11 @@ for iSubj = 1:length(uniqueSubjects)
     indS = strmatch( STUDY.subject{iSubj}, { STUDY.datasetinfo.subject }, 'exact' );
     for iFile = 1:length(indS)
         files(iSubj).file{iFile} = fullfile( STUDY.datasetinfo(indS(iFile)).filepath, STUDY.datasetinfo(indS(iFile)).filename);
-        if isfield(STUDY.datasetinfo(indS(iFile)), 'session') && ~isempty(STUDY.datasetinfo(indS(iFile)).session)
-            files(iSubj).session(iFile) = STUDY.datasetinfo(indS(iFile)).session;
-        else
-            files(iSubj).session(iFile) = iFile;
-        end
+        files(iSubj).session(iFile) = STUDY.datasetinfo(indS(iFile)).session; % In this tool we allow only one file per session. Number of session = length(files per subject)
         if isfield(STUDY.datasetinfo(indS(iFile)), 'run')
-            files(iSubj).run(iFile) = STUDY.datasetinfo(indS(iFile)).run;
+            files(iSubj).run(iFile) = STUDY.datasetinfo(indS(iFile)).run; % In this tool we allow only one file per session -> run = 1
         else
-            files(iSubj).run(iFile) = 1;  % Assume only one run
+            files(iSubj).run(iFile) = 1;
         end
     end
 end
@@ -150,12 +142,10 @@ if nargin < 1
     com = sprintf('pop_exportbids(STUDY, %s);', vararg2str(options));
 end
 
-function pInfo = getpInfo(EEG)
-    pInfo = EEG(1).BIDS.pInfo;
-    for a=2:numel(EEG)
-        if sum(strcmp(pInfo(:,1),EEG(a).BIDS.pInfo(2,1))) == 0
-            pInfo = [pInfo; EEG(a).BIDS.pInfo(2,:)];
-        end
+function pInfo = getpInfo(ALLEEG)
+    pInfo = ALLEEG(1).BIDS.pInfo;
+    for a=2:numel(ALLEEG)
+        pInfo = [pInfo; ALLEEG(a).BIDS.pInfo(2,:)];
     end
 end
 end
