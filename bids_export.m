@@ -802,6 +802,7 @@ miscChannels = 0;
 
 % Count the number of eeg and mocap channels  
 nbEEGChan = numel(find(strcmp({EEG.chanlocs.type}, 'EEG')));
+nbEOGChan = numel(find(strcmp({EEG.chanlocs.type}, 'EOG')));
 nbMocapChan = numel(find(strcmp({EEG.chanlocs.type}, 'MOCAP')));
 
 % Write EEG channels.tsv 
@@ -817,7 +818,7 @@ else
         else
             type = EEG.chanlocs(iChan).type;
         end
-        if strcmpi(type, 'eeg')
+        if strcmpi(type, 'eeg') || strcmpi(type, 'eog')
             unit = 'microV';
         elseif strcmpi(type, 'mocap')
             continue
@@ -903,7 +904,7 @@ if ~isempty(chanlocs)
         for iChan = 1:length(EEG.chanlocs)
             EEG.chanlocs(iChan).ref = EEG.chanlocs(end).labels;
         end
-    elseif length(EEG.chanlocs) ~= nbEEGChan
+    elseif length(EEG.chanlocs) ~= nbEEGChan+nbEOGChan
         error(sprintf('Number of channels in channel location inconsistent with data for file %s', fileIn));
     end
 end
