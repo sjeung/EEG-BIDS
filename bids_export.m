@@ -358,7 +358,7 @@ if ~isempty(opt.pInfo)
             if length(opt.pInfo{iSubj,1}) > 3 && isequal('sub-', opt.pInfo{iSubj,1}(1:4))
                 participants{iSubj, 1} = opt.pInfo{iSubj,1};
             else
-                participants{iSubj, 1} = sprintf('sub-%s', opt.pInfo{iSubj,1});
+                participants{iSubj, 1} = sprintf('sub-%03d', opt.pInfo{iSubj,1});
             end
         else
             participants{iSubj, 1} = sprintf('sub-%3.3d', iSubj-1);
