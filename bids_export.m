@@ -877,12 +877,12 @@ if ~isempty(EEG.chanlocs)
                 spatialUnit = 'degrees';
             end
             
-            if strcmpi(mocapLabel(1:4),'quat')
-                timeUnit = []; 
-            elseif strcmpi(mocapLabel(1:3),'vel')
+            if strcmpi(mocapLabel(1:3),'vel')
                 timeUnit = ' per second';
             elseif strcmpi(mocapLabel(1:3),'acc')
                 timeUnit = ' per second squared';
+            else % for all other cases that are not declared
+                timeUnit = []; 
             end
             
             unit = [spatialUnit timeUnit];
