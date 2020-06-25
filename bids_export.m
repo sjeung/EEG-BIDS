@@ -358,7 +358,7 @@ if ~isempty(opt.pInfo)
             if length(opt.pInfo{iSubj,1}) > 3 && isequal('sub-', opt.pInfo{iSubj,1}(1:4))
                 participants{iSubj, 1} = opt.pInfo{iSubj,1};
             else
-                participants{iSubj, 1} = sprintf('sub-%s', opt.pInfo{iSubj,1});
+                participants{iSubj, 1} = sprintf('sub-%03d', opt.pInfo{iSubj,1});
             end
         else
             participants{iSubj, 1} = sprintf('sub-%3.3d', iSubj-1);
@@ -806,6 +806,7 @@ miscChannels = 0;
 
 % Count the number of eeg and mocap channels  
 nbEEGChan = numel(find(strcmp({EEG.chanlocs.type}, 'EEG')));
+nbEOGChan = numel(find(strcmp({EEG.chanlocs.type}, 'EOG')));
 nbMocapChan = numel(find(strcmp({EEG.chanlocs.type}, 'MOCAP')));
 
 % Write EEG channels.tsv 
@@ -821,7 +822,7 @@ else
         else
             type = EEG.chanlocs(iChan).type;
         end
-        if strcmpi(type, 'eeg')
+        if strcmpi(type, 'eeg') || strcmpi(type, 'eog')
             unit = 'microV';
         elseif strcmpi(type, 'mocap')
             continue
@@ -880,12 +881,12 @@ if ~isempty(EEG.chanlocs)
                 spatialUnit = 'degrees';
             end
             
-            if strcmpi(mocapLabel(1:4),'quat')
-                timeUnit = []; 
-            elseif strcmpi(mocapLabel(1:3),'vel')
+            if strcmpi(mocapLabel(1:3),'vel')
                 timeUnit = ' per second';
             elseif strcmpi(mocapLabel(1:3),'acc')
                 timeUnit = ' per second squared';
+            else % for all other cases that are not declared
+                timeUnit = []; 
             end
             
             unit = [spatialUnit timeUnit];
@@ -907,7 +908,7 @@ if ~isempty(chanlocs)
         for iChan = 1:length(EEG.chanlocs)
             EEG.chanlocs(iChan).ref = EEG.chanlocs(end).labels;
         end
-    elseif length(EEG.chanlocs) ~= nbEEGChan
+    elseif length(EEG.chanlocs) ~= nbEEGChan+nbEOGChan
         error(sprintf('Number of channels in channel location inconsistent with data for file %s', fileIn));
     end
 end
