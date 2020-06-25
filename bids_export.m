@@ -53,7 +53,7 @@
 %  'targetdir' - [string] target directory. Default is 'bidsexport' in the
 %                current folder.
 %
-%  'taskname'  - [string] name of the task. No space are allowed and no
+%  'taskName'  - [string] name of the task. No space are allowed and no
 %                special characters. Default is ''.
 %
 %  'README'    - [string] content of the README file. If the string points
@@ -375,7 +375,7 @@ end
 % write participants field description (participants.json)
 % --------------------------------------------------------
 descFields = { 'LongName'     'optional' 'char'   '';
-    'Levels'       'optional' 'struct' {};
+    'Levels'       'optional' 'struct' struct([]);
     'Description'  'optional' 'char'   '';
     'Units'        'optional' 'char'   '';
     'TermURL'      'optional' 'char'   '' };
@@ -696,7 +696,7 @@ for iEvent = 1:length(EEG.event)
 
                 case 'sample'
                     if isfield(EEG.event, tmpField)
-                        sample = num2str(EEG.event.(tmpField));
+                        sample = num2str(EEG.event(iEvent).(tmpField));
                     else
                         sample = 'n/a';
                     end
@@ -706,25 +706,29 @@ for iEvent = 1:length(EEG.event)
                     fprintf(fid, '\t%s', sample);
 
                 case 'trial_type'
-                    % trial type (which is the type of event - not the same as EEGLAB)
-                    trialType = 'STATUS';
-                    if ~isempty(EEG.event(iEvent).(tmpField))
-                        eventVal = EEG.event(iEvent).(tmpField);
+                    % trial type (which is the experimental condition - not the same as EEGLAB)
+                    if isfield(EEG.event(iEvent), tmpField) && ~isempty(EEG.event(iEvent).(tmpField))
+                        trialType = EEG.event(iEvent).(tmpField);
                     else
-                        eventVal = EEG.event(iEvent).type;
-                    end
-                    if ~isempty(opt.trialtype)
-                        % mapping on event value
-                        if ~isempty(eventVal)
-                            indTrial = strmatch(eventVal, opt.trialtype(:,1), 'exact');
-                            if ~isempty(indTrial)
-                                trialType = opt.trialtype{indTrial,2};
+                        trialType = 'STATUS';
+    %                     if ~isempty(EEG.event(iEvent).(tmpField))
+    %                         eventVal = EEG.event(iEvent).(tmpField);
+    %                     else
+                            eventVal = EEG.event(iEvent).type;
+    %                     end
+                        if ~isempty(opt.trialtype)
+                            % mapping on event value
+                            if ~isempty(eventVal)
+                                indTrial = strmatch(eventVal, opt.trialtype(:,1), 'exact');
+                                if ~isempty(indTrial)
+                                    trialType = opt.trialtype{indTrial,2};
+                                end
                             end
                         end
-                    end
-                    if insertEpoch
-                        if any(indtle == iEvent)
-                            trialType = 'Epoch';
+                        if insertEpoch
+                            if any(indtle == iEvent)
+                                trialType = 'Epoch';
+                            end
                         end
                     end
                     if isnumeric(trialType)
@@ -977,7 +981,7 @@ tInfoFields = {...
     'EEGReference' 'REQUIRED' 'char' 'Unknown';
     'PowerLineFrequency' 'REQUIRED' '' 0;
     'EEGGround' 'RECOMMENDED ' 'char' '';
-    'HeadCircumference' 'OPTIONAL ' 'char' '';
+    'HeadCircumference' 'OPTIONAL ' '' 0;
     'MiscChannelCount' ' OPTIONAL' '' '';
     'TriggerChannelCount' 'RECOMMENDED' 'char' '';
     'EEGPlacementScheme' 'RECOMMENDED' 'char' '';
@@ -985,8 +989,8 @@ tInfoFields = {...
     'ManufacturersModelName' 'OPTIONAL' 'char' '';
     'CapManufacturer' 'RECOMMENDED' 'char' 'Unknown';
     'CapManufacturersModelName' 'OPTIONAL' 'char' '';
-    'HardwareFilters' 'OPTIONAL' 'char' '';
-    'SoftwareFilters' 'REQUIRED' 'char' 'n/a';
+    'HardwareFilters' 'OPTIONAL' 'struct' struct([]);
+    'SoftwareFilters' 'REQUIRED' 'struct' 'n/a';
     'RecordingDuration' 'RECOMMENDED' '' 'n/a';
     'RecordingType' 'RECOMMENDED' 'char' '';
     'EpochLength' 'RECOMMENDED' '' 'n/a';

@@ -17,6 +17,7 @@
 %
 % Author: Dung Truong, Arnaud Delorme
 function [EEG, command] = pop_participantinfo(EEG)
+    command = '[EEG, command] = pop_participantinfo(EEG);';
     %% check if there's already an opened window
     if ~isempty(findobj('Tag','pInfoTable'))
         error('A window is already openened for pop_participantinfo');
@@ -101,7 +102,7 @@ function [EEG, command] = pop_participantinfo(EEG)
         field = pFields{i};
         if numel(EEG) == 1 || ~isfield(pInfoBIDS.(field),'Levels') % if previous specification of this field didn't include Levels
             data{i,find(strcmp(tbl.ColumnName, 'Levels'))} = 'n/a';
-        elseif isempty(pInfoBIDS.(field).Levels)
+        elseif isstruct(pInfoBIDS.(field).Levels) && (isempty(pInfoBIDS.(field).Levels) || isempty(fieldnames(pInfoBIDS.(field).Levels)))
             data{i,find(strcmp(tbl.ColumnName, 'Levels'))} = 'Click to specify';
         else
             levelTxt = pInfoBIDS.(field).Levels;
@@ -137,24 +138,15 @@ function [EEG, command] = pop_participantinfo(EEG)
         for idx=1:length(fields)
             field = fields{idx};
             pInfoDesc.(field).Description = pInfoBIDS.(field).Description;
-            if isempty(pInfoBIDS.(field).Units)
-                pInfoDesc.(field).Units = 'n/a';
-            else
+            % Only add Units and Levels to pInfoDesc if they have values
+            if ~isempty(pInfoBIDS.(field).Units)
                 pInfoDesc.(field).Units = pInfoBIDS.(field).Units;
             end
-            if isfield(pInfoBIDS.(field),'Levels') 
-                if isempty(pInfoBIDS.(field).Levels)
-                    pInfoDesc.(field).Levels = struct([]);
-                elseif ~strcmp(pInfoBIDS.(field).Levels, 'n/a')
-                    pInfoDesc.(field).Levels = pInfoBIDS.(field).Levels;
-                end
+            if (isstruct(pInfoBIDS.(field).Levels) && ~isempty(pInfoBIDS.(field).Levels) && ~isempty(fieldnames(pInfoBIDS.(field).Levels))) || (ischar(pInfoBIDS.(field).Levels) && ~strcmp(pInfoBIDS.(field).Levels, 'n/a'))
+                pInfoDesc.(field).Levels = pInfoBIDS.(field).Levels;
             end
         end
-        if numel(EEG) == 1
-            command = '[EEG, command] = pop_participantinfo(EEG);';
-        else
-            command = '[EEG, command] = pop_participantinfo(EEG);';
-        end
+
         for e=1:numel(EEG)
             if ~isfield(EEG(e),'BIDS')
                 EEG(e).BIDS = [];
@@ -163,12 +155,32 @@ function [EEG, command] = pop_participantinfo(EEG)
             if isfield(EEG(e).BIDS,'tInfo')
                 tInfo = EEG(e).BIDS.tInfo;
             end
-            tInfo.HeadCircumference = char(pTable.Data{e,strcmp('HeadCircumference',pTable.ColumnName)});
-            tInfo.SubjectArtefactDescription = char(pTable.Data{e,strcmp('SubjectArtefactDescription',pTable.ColumnName)});
+            if isempty(pTable.Data{e,strcmp('HeadCircumference',pTable.ColumnName)})
+                if isfield(tInfo, 'HeadCircumference')
+                    tInfo = rmfield(tInfo, 'HeadCircumference');
+                end
+            else
+                if ~isnumeric(pTable.Data{e,strcmp('HeadCircumference',pTable.ColumnName)})
+                    tInfo.HeadCircumference = str2double(pTable.Data{e,strcmp('HeadCircumference',pTable.ColumnName)});
+                else
+                    tInfo.HeadCircumference = pTable.Data{e,strcmp('HeadCircumference',pTable.ColumnName)};
+                end
+            end
+            if isempty(pTable.Data{e,strcmp('SubjectArtefactDescription',pTable.ColumnName)})
+                if isfield(tInfo, 'SubjectArtefactDescription')
+                    tInfo = rmfield(tInfo,'SubjectArtefactDescription');
+                end
+            else
+                if ~ischar(pTable.Data{e,strcmp('SubjectArtefactDescription',pTable.ColumnName)})
+                    tInfo.SubjectArtefactDescription = char(pTable.Data{e,strcmp('SubjectArtefactDescription',pTable.ColumnName)});
+                else
+                    tInfo.SubjectArtefactDescription = pTable.Data{e,strcmp('SubjectArtefactDescription',pTable.ColumnName)};
+                end
+            end
             EEG(e).BIDS.tInfo = tInfo;
             EEG(e).BIDS.pInfoDesc = pInfoDesc;
             colIdx = 1:numel(pTable.ColumnName);
-            colIdx = colIdx(~strcmp('HeadCircumference',pTable.ColumnName) & ~strcmp('SubjectArtefactDescription',pTable.ColumnName));
+            colIdx = colIdx(~strcmp('HeadCircumference',pTable.ColumnName) & ~strcmp('SubjectArtefactDescription',pTable.ColumnName)); % these are not pInfo fields
             EEG(e).BIDS.pInfo = [pFields; pTable.Data(e,colIdx(2:end))];
             EEG(e).saved = 'no';
             EEG(e).history = [EEG(e).history command];
@@ -235,7 +247,8 @@ function [EEG, command] = pop_participantinfo(EEG)
             % for each row of the pInfo table
             for r=1:size(pTbl.Data,1)
                 % if same subject with celected cell then copy value to that row as well
-                if strcmp(pTbl.Data{r,2}, pTbl.Data{row,2})
+                participantColIdx = find(strcmp(pTbl.ColumnName,'participant_id'));
+                if strcmp(pTbl.Data{r,participantColIdx}, pTbl.Data{row,participantColIdx})
                     pTbl.Data{r,col} = entered;
                 end
             end
@@ -415,7 +428,7 @@ function [EEG, command] = pop_participantinfo(EEG)
                     pBIDS.participant_id.Levels = 'n/a';
                 elseif strcmp(pFields{idx}, 'Gender')
                     pBIDS.Gender.Description = 'Participant gender';      
-                    pBIDS.Gender.Levels = struct([]);
+                    pBIDS.Gender.Levels = struct;
                     pBIDS.Gender.Units = '';
                 elseif strcmp(pFields{idx}, 'Age')
                     pBIDS.Age.Description = 'Participant age (years)';
@@ -424,7 +437,7 @@ function [EEG, command] = pop_participantinfo(EEG)
                 elseif strcmp(pFields{idx}, 'Group')
                     pBIDS.Group.Description = 'Participant group label';
                     pBIDS.Group.Units = '';
-                    pBIDS.Group.Levels = struct([]);
+                    pBIDS.Group.Levels = struct;
     %             elseif strcmp(pFields{idx}, 'HeadCircumference')
     %                 pBIDS.HeadCircumference.Description = ' Participant head circumference';
     %                 pBIDS.HeadCircumference.Units = 'cm';
@@ -444,6 +457,22 @@ function [EEG, command] = pop_participantinfo(EEG)
             end
         else
             pFields = fieldnames(pBIDS)';
+            for p=1:numel(pFields)
+                if ~isfield(pBIDS.(pFields{p}), 'Units')
+                    if strcmp(pFields{p}, 'Age')
+                        pBIDS.(pFields{p}).Units = 'years';
+                    else
+                        pBIDS.(pFields{p}).Units = '';
+                    end
+                end
+                if ~isfield(pBIDS.(pFields{p}), 'Levels')
+                    if strcmp(pFields{p}, 'Age') || strcmp(pFields{p}, 'participant_id')
+                        pBIDS.(pFields{p}).Levels = 'n/a';
+                    else
+                        pBIDS.(pFields{p}).Levels = struct;
+                    end
+                end
+            end
         end 
     end
     function info = getpInfoDesc()
