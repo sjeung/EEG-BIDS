@@ -6,6 +6,9 @@
 % Inputs:
 %     EEG - EEGLAB dataset or group of dataset
 %
+% Optional input:
+%  'default'   - generate BIDS event info using default values without
+%                popping up the GUI
 %
 % Authors: Arnaud Delorme, Dung Truong SCCN, INC, UCSD, 2020
 
@@ -25,7 +28,7 @@
 % along with this program; if not, write to the Free Software
 % Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
-function [EEG,com] = pop_taskinfo(EEG)
+function [EEG,com] = pop_taskinfo(EEG, varargin)
     %% Default settings
     bg = [0.65 0.76 1];
     fg = [0 0 0.4];
@@ -143,8 +146,12 @@ function [EEG,com] = pop_taskinfo(EEG)
     % prefill data
     preFill();
     
-    % wait
-    waitfor(f);
+    if nargin < 2
+        %% wait
+        waitfor(f);
+    elseif nargin < 3 && ischar(varargin{1}) && strcmp(varargin{1}, 'default')
+        okCB('','');
+    end
     
     %% history
     com = sprintf('pop_taskinfo(ALLEG);');
@@ -205,9 +212,20 @@ function [EEG,com] = pop_taskinfo(EEG)
                                 end
                             end
                         end
+                    elseif isfield(tInfo,objs(i).Tag) % remove field if no longer has value
+                        tInfo = rmfield(tInfo, objs(i).Tag);
                     end
                 end
             end
+            
+            % make sure it's struct datatype when empty
+            if isempty(gInfo)
+                gInfo = struct([]);
+            end
+            if isempty(tInfo)
+                tInfo = struct([]);
+            end
+            
             % update BIDS structure
             bids.tInfo = tInfo;
             bids.gInfo = gInfo;
@@ -262,28 +280,28 @@ function [EEG,com] = pop_taskinfo(EEG)
     function tInfo = gettInfo(EEG)
         hasBIDS = arrayfun(@(x) isfield(x,'BIDS') && ~isempty(x.BIDS),EEG);
         if sum(hasBIDS) == 0 %if no BIDS found for any EEG
-            tInfo = [];
+            tInfo = struct([]);
         else % at least one EEG has BIDS
             if sum(hasBIDS) < numel(EEG) % not all have BIDS
                 warning('Not all EEG contains BIDS information.');
             end
             hastInfo = arrayfun(@(x) isfield(x,'BIDS') && isfield(x.BIDS,'tInfo') && ~isempty(x.BIDS.tInfo),EEG);
             if sum(hastInfo) == 0
-                tInfo = [];
+                tInfo = struct([]);
             else % at least one EEG has BIDS.tInfo
                 try
                     bids = [EEG(hastInfo).BIDS];
                     alltInfo = [bids.tInfo];
                     if numel(alltInfo) < numel(EEG)
                         tInfo = EEG(find(hastInfo,1)).BIDS.tInfo;
-                        warning('Not all EEG contains tInfo structure. Using tInfo of EEG(%d)...',find(hastInfo,1));
+                        warning('Not all EEG contains tInfo structure. Using first available tInfo of EEG(%d)...',find(hastInfo,1));
                     else
                         tInfo = alltInfo(1);
-                        fprintf('Using tInfo of EEG(1)...\n');
+                        fprintf('Using task info of the first dataset for all datasets...\n');
                     end
                 catch % field inconsistent
                     tInfo = EEG(find(hastInfo,1)).BIDS.tInfo;
-                    warning('Inconsistence found in tInfo structures. Using tInfo of EEG(%d)...',find(hastInfo,1));
+                    warning('tInfo structures are inconsistent across datasets. Using first available tInfo of EEG(%d)...',find(hastInfo,1));
                 end
             end
         end
@@ -291,14 +309,14 @@ function [EEG,com] = pop_taskinfo(EEG)
     function gInfo = getgInfo(EEG)
         hasBIDS = arrayfun(@(x) isfield(x,'BIDS') && ~isempty(x.BIDS),EEG);
         if sum(hasBIDS) == 0 %if no BIDS found for any EEG
-            gInfo = [];
+            gInfo = struct([]);
         else % at least one EEG has BIDS
             if sum(hasBIDS) < numel(EEG) % not all have BIDS
                 warning('Not all EEG contains BIDS information.');
             end
             hasgInfo = arrayfun(@(x) isfield(x,'BIDS') && isfield(x.BIDS,'gInfo') && ~isempty(x.BIDS.gInfo),EEG);
             if sum(hasgInfo) == 0
-                gInfo = [];
+                gInfo = struct([]);
             else % at least one EEG has BIDS.gInfo
                 try
                     bids = [EEG(hasgInfo).BIDS];

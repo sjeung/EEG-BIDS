@@ -58,10 +58,11 @@ if nargin < 3 && ~ischar(STUDY)
         { 'Style', 'pushbutton', 'string', 'Edit task & EEG info' 'tag' 'task' 'callback' cb_task }, ...
         { 'Style', 'pushbutton', 'string', 'Edit participants' 'tag' 'participants' 'callback' cb_participants }, ...
         { 'Style', 'pushbutton', 'string', 'Edit event info' 'tag' 'events' 'callback' cb_events }, ...
+        { 'Style', 'checkbox', 'string', 'Do not use participants ID and create anonymized participant ID instead' 'tag' 'newids' }, ...
         };
     relSize = 0.7;
-    geometry = { [1] [1] [1-relSize relSize*0.8 relSize*0.2] [1-relSize relSize] [1] [1] [1 1 1] };
-    geomvert =   [1  0.2 1                                                   1  1   3   1];
+    geometry = { [1] [1] [1-relSize relSize*0.8 relSize*0.2] [1-relSize relSize] [1] [1] [1 1 1] [1] };
+    geomvert =   [1  0.2 1                                                   1  1   3    1       1 ];
     userdata.EEG = EEG;
     userdata.STUDY = STUDY;
     [results,userdata,~,restag] = inputgui( 'geometry', geometry, 'geomvert', geomvert, 'uilist', uilist, 'helpcom', 'pophelp(''pop_exportbids'');', 'title', 'Export EEGLAB STUDY to BIDS -- pop_exportbids()', 'userdata', userdata );
@@ -79,21 +80,28 @@ if nargin < 3 && ~ischar(STUDY)
 %     end
     
     % options
-    options = { 'targetdir' restag.outputfolder 'License' restag.license 'CHANGES' restag.changes};
-    if isfield(EEG(1), 'BIDS')
-        if isfield(EEG(1).BIDS, 'gInfo') && isfield(EEG(1).BIDS.gInfo,'README') 
-            options = [options 'README' {EEG(1).BIDS.gInfo.README}];
-            EEG(1).BIDS.gInfo = rmfield(EEG(1).BIDS.gInfo,'README');
-        end
-        if isfield(EEG(1).BIDS, 'gInfo') && isfield(EEG(1).BIDS.gInfo,'TaskName') 
-            options = [options 'taskName' {EEG(1).BIDS.gInfo.TaskName}];
-            EEG(1).BIDS.gInfo = rmfield(EEG(1).BIDS.gInfo,'TaskName');
-        end
-        bidsFieldsFromALLEEG = fieldnames(EEG(1).BIDS); % All EEG should share same BIDS info -> using EEG(1)
-        for f=1:numel(bidsFieldsFromALLEEG)
-            options = [options bidsFieldsFromALLEEG{f} {EEG(1).BIDS.(bidsFieldsFromALLEEG{f})}];
-        end
+    options = { 'targetdir' restag.outputfolder 'License' restag.license 'CHANGES' restag.changes 'createids' fastif(restag.newids, 'on', 'off') };
+    
+    if ~isfield(EEG(1), 'BIDS') % none of the edit button was clicked
+        EEG = pop_eventinfo(EEG, 'default');
+        EEG = pop_participantinfo(EEG, STUDY, 'default');
+        EEG = pop_taskinfo(EEG, 'default');
     end
+    
+    % rearrange information in BIDS structures
+    if isfield(EEG(1).BIDS, 'gInfo') && isfield(EEG(1).BIDS.gInfo,'README') 
+        options = [options 'README' {EEG(1).BIDS.gInfo.README}];
+        EEG(1).BIDS.gInfo = rmfield(EEG(1).BIDS.gInfo,'README');
+    end
+    if isfield(EEG(1).BIDS, 'gInfo') && isfield(EEG(1).BIDS.gInfo,'TaskName') 
+        options = [options 'taskName' {EEG(1).BIDS.gInfo.TaskName}];
+        EEG(1).BIDS.gInfo = rmfield(EEG(1).BIDS.gInfo,'TaskName');
+    end
+    bidsFieldsFromALLEEG = fieldnames(EEG(1).BIDS); % All EEG should share same BIDS info -> using EEG(1)
+    for f=1:numel(bidsFieldsFromALLEEG)
+        options = [options bidsFieldsFromALLEEG{f} {EEG(1).BIDS.(bidsFieldsFromALLEEG{f})}];
+    end        
+
     
 elseif ischar(STUDY)
     command = STUDY;
@@ -164,6 +172,7 @@ if ~isempty(pInfo)
     options = [options 'pInfo' {pInfo}];
 end
 bids_export(subjects, options{:});
+disp('Done');
 
 % history
 % -------
